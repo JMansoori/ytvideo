@@ -16,49 +16,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Replace with your own API key
-RAPIDAPI_KEY = "782d6d8862msh8f2f93f8954c7bcp1d4295jsn49c7eca0cd55"
-API_HOST = "youtube-info-download-api.p.rapidapi.com"
-
-# Route to get download info (e.g., download URL)
+# Route for handling the download request
 @app.get("/download")
 def get_download_link(video_url: str, format: str = "mp3", audio_quality: str = "128"):
-    url = f"https://{API_HOST}/ajax/download.php"
+    # YouTube Info Download API URL
+    url = "https://youtube-info-download-api.p.rapidapi.com/ajax/download.php"
+    
     headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": API_HOST
+        "x-rapidapi-key": "your-rapidapi-key",  # Replace with your RapidAPI key
+        "x-rapidapi-host": "youtube-info-download-api.p.rapidapi.com"
     }
+    
     params = {
-        "format": format,
-        "add_info": "0",
-        "url": video_url,
-        "audio_quality": audio_quality
+        "format": format,  # Audio/Video format (mp3, mp4, etc.)
+        "add_info": "0",   # Don't add extra info
+        "url": video_url,  # YouTube video URL
+        "audio_quality": audio_quality  # Audio quality for mp3 (e.g., 128)
     }
 
+    # Send request to RapidAPI
     response = requests.get(url, headers=headers, params=params)
-    
-    # Log the response from RapidAPI for debugging
-    print("API Response:", response.json())
-    
-    # Check if the download URL is in the response and return it
-    if response.ok and 'download_url' in response.json():
-        return response.json()
+
+    # Log the response to see what's being returned (For debugging)
+    print("Response from RapidAPI:", response.json())
+
+    response_data = response.json()
+
+    # Check if download_url exists in the response
+    if 'download_url' in response_data:
+        return {"download_url": response_data['download_url']}
     else:
         return {"error": "Failed to retrieve download link"}
-
-
-# Route to fetch video info
-@app.get("/info")
-def get_video_info(video_url: str):
-    url = f"https://{API_HOST}/ajax/api.php"
-    headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": API_HOST
-    }
-    params = {
-        "function": "i",
-        "u": video_url
-    }
-
-    response = requests.get(url, headers=headers, params=params)
-    return response.json()
