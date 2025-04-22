@@ -5,6 +5,8 @@ import urllib.parse
 import re
 
 app = Flask(__name__)
+# Enable CORS for all routes
+CORS(app)
 
 # Load API key from config.json
 with open("config.json") as f:
