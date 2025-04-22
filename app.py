@@ -1,63 +1,61 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Downloader</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
-<body>
-    <h1>YouTube Video Downloader</h1>
-    <label for="video_url">Video URL: </label>
-    <input type="text" id="video_url" placeholder="Enter YouTube Video URL">
-    <label for="format">Format: </label>
-    <select id="format">
-        <option value="mp3">MP3</option>
-        <option value="mp4">MP4</option>
-    </select>
-    <label for="audio_quality">Audio Quality: </label>
-    <input type="text" id="audio_quality" placeholder="Audio Quality (e.g., 128)">
-    <button onclick="downloadVideo()">Download</button>
+from flask import Flask, request, jsonify
+import http.client
+import json
+import urllib.parse
+import re
 
-    <p id="message"></p>
+app = Flask(__name__)
+# Enable CORS for all routes
+CORS(app)
 
-    <script>
-        function downloadVideo() {
-            var video_url = document.getElementById('video_url').value;
-            var format = document.getElementById('format').value;
-            var audio_quality = document.getElementById('audio_quality').value;
+# Load API key from config.json
+with open("config.json") as f:
+    config = json.load(f)
+API_KEY = config["RAPIDAPI_KEY"]
+API_HOST = config["RAPIDAPI_HOST"]
 
-            if (!video_url) {
-                document.getElementById('message').innerText = "Please enter a video URL.";
-                return;
-            }
+def get_progress_url(video_url, format, audio_quality):
+    encoded_url = urllib.parse.quote(video_url, safe='')
+    conn = http.client.HTTPSConnection(API_HOST)
+    headers = {
+        'x-rapidapi-key': API_KEY,
+        'x-rapidapi-host': API_HOST
+    }
 
-            // Show message for progress
-            document.getElementById('message').innerText = "Fetching download link...";
+    path = f"/ajax/download.php?format={format}&add_info=0&url={encoded_url}&audio_quality={audio_quality}"
+    conn.request("GET", path, headers=headers)
+    res = conn.getresponse()
+    data = res.read().decode("utf-8")
 
-            // Make the AJAX request to the Flask backend
-            $.ajax({
-                url: 'https://your-render-app-url.onrender.com/download',  // Replace with your Render URL
-                method: 'GET',
-                data: {
-                    video_url: video_url,
-                    format: format,
-                    audio_quality: audio_quality
-                },
-                success: function(response) {
-                    var downloadUrl = response.download_url;
+    match = re.search(r'"progress_url"\s*:\s*"([^"]+)"', data)
+    return match.group(1) if match else None
 
-                    if (downloadUrl) {
-                        document.getElementById('message').innerHTML = 'Download ready! <a href="' + downloadUrl + '" target="_blank">Click here to download</a>';
-                    } else {
-                        document.getElementById('message').innerText = "Failed to retrieve download link. Please try again.";
-                    }
-                },
-                error: function() {
-                    document.getElementById('message').innerText = "Error occurred. Please try again.";
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+def get_download_url(progress_url):
+    clean_url = progress_url.replace("\\/", "/")
+    conn = http.client.HTTPSConnection("pamela88.oceansaver.in")  # Will be replaced dynamically
+    path = clean_url.replace("https://pamela88.oceansaver.in", "")
+    conn.request("GET", path)
+    res = conn.getresponse()
+    data = res.read().decode("utf-8")
+
+    match = re.search(r'"download_url"\s*:\s*"([^"]+)"', data)
+    return match.group(1).replace("\\/", "/") if match else None
+
+@app.route("/download", methods=["GET"])
+def download():
+    video_url = request.args.get("video_url")
+    format = request.args.get("format", "mp4")
+    audio_quality = request.args.get("audio_quality", "128")
+
+    progress_url = get_progress_url(video_url, format, audio_quality)
+    if not progress_url:
+        return jsonify({"error": "Failed to get progress URL"}), 500
+
+    download_url = get_download_url(progress_url)
+    if not download_url:
+        return jsonify({"error": "Failed to get download URL"}), 500
+
+    return jsonify({"download_url": download_url})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
