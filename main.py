@@ -32,7 +32,16 @@ def get_download_link(video_url: str, format: str = "mp3", audio_quality: str = 
     }
 
     response = requests.get(url, headers=headers, params=params)
-    return response.json()
+    
+    # Log the response from RapidAPI for debugging
+    print("API Response:", response.json())
+    
+    # Check if the download URL is in the response and return it
+    if response.ok and 'download_url' in response.json():
+        return response.json()
+    else:
+        return {"error": "Failed to retrieve download link"}
+
 
 # Route to fetch video info
 @app.get("/info")
