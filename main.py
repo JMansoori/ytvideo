@@ -1,49 +1,73 @@
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
-import requests
+from flask import Flask, request, jsonify
+import http.client
+import time
 
-app = FastAPI()
-# Root route
-@app.get("/")
-def read_root():
-    return {"message": "API is working"}
+app = Flask(__name__)
 
-# CORS setup for frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://www.zooobify.in"],  # Allow only this domain
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-# Route for handling the download request
-@app.get("/download")
-def get_download_link(video_url: str, format: str = "mp3", audio_quality: str = "128"):
-    # YouTube Info Download API URL
-    url = "https://youtube-info-download-api.p.rapidapi.com/ajax/download.php"
-    
+# Function to get progress URL
+def get_progress_url(video_url, format="mp3", audio_quality="128"):
+    conn = http.client.HTTPSConnection("youtube-info-download-api.p.rapidapi.com")
+
     headers = {
-        "x-rapidapi-key": "your-rapidapi-key",  # Replace with your RapidAPI key
-        "x-rapidapi-host": "youtube-info-download-api.p.rapidapi.com"
-    }
-    
-    params = {
-        "format": format,  # Audio/Video format (mp3, mp4, etc.)
-        "add_info": "0",   # Don't add extra info
-        "url": video_url,  # YouTube video URL
-        "audio_quality": audio_quality  # Audio quality for mp3 (e.g., 128)
+        'x-rapidapi-key': "782d6d8862msh8f2f93f8954c7bcp1d4295jsn49c7eca0cd55",
+        'x-rapidapi-host': "youtube-info-download-api.p.rapidapi.com"
     }
 
-    # Send request to RapidAPI
-    response = requests.get(url, headers=headers, params=params)
+    # Request to get the progress URL
+    conn.request("GET", f"/ajax/download.php?format={format}&add_info=0&url={video_url}&audio_quality={audio_quality}", headers=headers)
+    res = conn.getresponse()
+    data = res.read()
 
-    # Log the response to see what's being returned (For debugging)
-    print("Response from RapidAPI:", response.json())
+    # Decode the response
+    decoded_data = data.decode("utf-8")
+    print("Progress URL Response:", decoded_data)
 
-    response_data = response.json()
+    # Extract the progress URL from the response (parse the decoded_data here)
+    # You will need to adjust based on actual response format
+    progress_url = decoded_data  # Replace with actual progress URL extraction logic
 
-    # Check if download_url exists in the response
-    if 'download_url' in response_data:
-        return {"download_url": response_data['download_url']}
-    else:
-        return {"error": "Failed to retrieve download link"}
+    return progress_url
+
+
+# Function to get the final download URL from progress URL
+def get_download_url(progress_url):
+    conn = http.client.HTTPSConnection("pamela88.oceansaver.in")
+
+    headers = {
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    }
+
+    conn.request("GET", progress_url, headers=headers)
+    res = conn.getresponse()
+    data = res.read()
+
+    # Decode the data
+    decoded_data = data.decode("utf-8")
+    print("Download URL Response:", decoded_data)
+
+    # Extract the download URL (parse the decoded_data here)
+    download_url = decoded_data  # Replace with the actual logic to extract download_url
+
+    # Fix the escaped '/' in download_url
+    corrected_download_url = download_url.replace("\\/", "/")
+
+    return corrected_download_url
+
+
+@app.route('/download', methods=['GET'])
+def download_video():
+    video_url = request.args.get('video_url')
+    format = request.args.get('format', 'mp3')
+    audio_quality = request.args.get('audio_quality', '128')
+
+    # Step 1: Get the progress URL
+    progress_url = get_progress_url(video_url, format, audio_quality)
+
+    # Step 2: Get the download URL from the progress URL
+    download_url = get_download_url(progress_url)
+
+    return jsonify({"download_url": download_url})
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
