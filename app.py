@@ -1,48 +1,63 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import http.client
-import json
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>YouTube Video Downloader</h1>
+    <label for="video_url">Video URL: </label>
+    <input type="text" id="video_url" placeholder="Enter YouTube Video URL">
+    <label for="format">Format: </label>
+    <select id="format">
+        <option value="mp3">MP3</option>
+        <option value="mp4">MP4</option>
+    </select>
+    <label for="audio_quality">Audio Quality: </label>
+    <input type="text" id="audio_quality" placeholder="Audio Quality (e.g., 128)">
+    <button onclick="downloadVideo()">Download</button>
 
-app = Flask(__name__)
-CORS(app)  # This enables CORS for all domains by default
+    <p id="message"></p>
 
-@app.route('/download', methods=['GET'])
-def download():
-    video_url = request.args.get('video_url')
-    format = request.args.get('format', 'mp3')
+    <script>
+        function downloadVideo() {
+            var video_url = document.getElementById('video_url').value;
+            var format = document.getElementById('format').value;
+            var audio_quality = document.getElementById('audio_quality').value;
 
-    # Step 1: Encode the URL
-    encoded_url = video_url.replace(":", "%3A").replace("/", "%2F").replace("?", "%3F").replace("=", "%3D").replace("&", "%26")
+            if (!video_url) {
+                document.getElementById('message').innerText = "Please enter a video URL.";
+                return;
+            }
 
-    conn = http.client.HTTPSConnection("youtube-info-download-api.p.rapidapi.com")
+            // Show message for progress
+            document.getElementById('message').innerText = "Fetching download link...";
 
-    headers = {
-        'x-rapidapi-key': "782d6d8862msh8f2f93f8954c7bcp1d4295jsn49c7eca0cd55",
-        'x-rapidapi-host': "youtube-info-download-api.p.rapidapi.com"
-    }
+            // Make the AJAX request to the Flask backend
+            $.ajax({
+                url: 'https://your-render-app-url.onrender.com/download',  // Replace with your Render URL
+                method: 'GET',
+                data: {
+                    video_url: video_url,
+                    format: format,
+                    audio_quality: audio_quality
+                },
+                success: function(response) {
+                    var downloadUrl = response.download_url;
 
-    # Step 2: Get the progress URL
-    progress_path = f"/ajax/download.php?format={format}&add_info=0&url={encoded_url}&audio_quality=128"
-    conn.request("GET", progress_path, headers=headers)
-    res = conn.getresponse()
-    data = json.loads(res.read().decode("utf-8"))
-
-    # Step 3: Extract progress API URL
-    if 'progress_url' not in data:
-        return jsonify({"error": "Progress URL not found"}), 500
-
-    progress_url = data['progress_url'].replace("https://", "")
-    conn = http.client.HTTPSConnection(progress_url.split("/")[0])
-    conn.request("GET", "/" + "/".join(progress_url.split("/")[1:]))
-    res = conn.getresponse()
-    progress_data = json.loads(res.read().decode("utf-8"))
-
-    # Step 4: Extract final download URL
-    download_url = progress_data.get("download_url", "").replace("\\/", "/")
-    if not download_url:
-        return jsonify({"error": "Failed to retrieve download link"}), 500
-
-    return jsonify({"download_url": download_url})
-
-if __name__ == "__main__":
-    app.run(debug=True)
+                    if (downloadUrl) {
+                        document.getElementById('message').innerHTML = 'Download ready! <a href="' + downloadUrl + '" target="_blank">Click here to download</a>';
+                    } else {
+                        document.getElementById('message').innerText = "Failed to retrieve download link. Please try again.";
+                    }
+                },
+                error: function() {
+                    document.getElementById('message').innerText = "Error occurred. Please try again.";
+                }
+            });
+        }
+    </script>
+</body>
+</html>
