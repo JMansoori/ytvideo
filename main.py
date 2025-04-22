@@ -1,64 +1,59 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import http.client
 import json
+import urllib.parse
+import re
 
 app = Flask(__name__)
-CORS(app)
 
-@app.route('/download', methods=['GET'])
+# Load API key from config.json
+with open("config.json") as f:
+    config = json.load(f)
+API_KEY = config["RAPIDAPI_KEY"]
+API_HOST = config["RAPIDAPI_HOST"]
+
+def get_progress_url(video_url, format, audio_quality):
+    encoded_url = urllib.parse.quote(video_url, safe='')
+    conn = http.client.HTTPSConnection(API_HOST)
+    headers = {
+        'x-rapidapi-key': API_KEY,
+        'x-rapidapi-host': API_HOST
+    }
+
+    path = f"/ajax/download.php?format={format}&add_info=0&url={encoded_url}&audio_quality={audio_quality}"
+    conn.request("GET", path, headers=headers)
+    res = conn.getresponse()
+    data = res.read().decode("utf-8")
+
+    match = re.search(r'"progress_url"\s*:\s*"([^"]+)"', data)
+    return match.group(1) if match else None
+
+def get_download_url(progress_url):
+    clean_url = progress_url.replace("\\/", "/")
+    conn = http.client.HTTPSConnection("pamela88.oceansaver.in")  # Will be replaced dynamically
+    path = clean_url.replace("https://pamela88.oceansaver.in", "")
+    conn.request("GET", path)
+    res = conn.getresponse()
+    data = res.read().decode("utf-8")
+
+    match = re.search(r'"download_url"\s*:\s*"([^"]+)"', data)
+    return match.group(1).replace("\\/", "/") if match else None
+
+@app.route("/download", methods=["GET"])
 def download():
-    video_url = request.args.get('video_url')
-    format_ = request.args.get('format', 'mp4')
-    audio_quality = request.args.get('audio_quality', '128')
+    video_url = request.args.get("video_url")
+    format = request.args.get("format", "mp4")
+    audio_quality = request.args.get("audio_quality", "128")
 
-    if not video_url:
-        return jsonify({"error": "Missing video URL"}), 400
+    progress_url = get_progress_url(video_url, format, audio_quality)
+    if not progress_url:
+        return jsonify({"error": "Failed to get progress URL"}), 500
 
-    try:
-        conn = http.client.HTTPSConnection("youtube-info-download-api.p.rapidapi.com")
-        headers = {
-            'x-rapidapi-key': '782d6d8862msh8f2f93f8954c7bcp1d4295jsn49c7eca0cd55',  # Replace with your actual key
-            'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com'
-        }
+    download_url = get_download_url(progress_url)
+    if not download_url:
+        return jsonify({"error": "Failed to get download URL"}), 500
 
-        # Format the request path
-        encoded_url = video_url.replace(':', '%3A').replace('/', '%2F').replace('?', '%3F').replace('=', '%3D').replace('&', '%26')
-        path = f"/ajax/download.php?format={format_}&add_info=0&url={encoded_url}&audio_quality={audio_quality}"
-
-        conn.request("GET", path, headers=headers)
-        res = conn.getresponse()
-        data = res.read().decode("utf-8")
-
-        # Check if "download_url" exists in response
-        try:
-            download_data = json.loads(data)
-            progress_url = download_data.get("progress_url")
-        except Exception:
-            return jsonify({"error": "Unexpected response format from RapidAPI"}), 500
-
-        if not progress_url:
-            return jsonify({"error": "No progress URL returned"}), 500
-
-        # Fetch progress to get final download URL
-        conn.request("GET", progress_url, headers=headers)
-        res2 = conn.getresponse()
-        progress_data = res2.read().decode("utf-8")
-
-        try:
-            progress_json = json.loads(progress_data)
-            raw_url = progress_json.get("download_url", "")
-            clean_url = raw_url.replace("\\/", "/")
-        except Exception:
-            return jsonify({"error": "Could not parse progress response"}), 500
-
-        return jsonify({"download_url": clean_url})
-
-    except Exception as e:
-        print("Server Error:", str(e))
-        return jsonify({"error": "Failed to retrieve download link"}), 500
+    return jsonify({"download_url": download_url})
 
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)
