@@ -7,12 +7,11 @@ app = FastAPI()
 # CORS setup for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict to your domain in production
+    allow_origins=["https://www.zooobify.in"],  # Allow only this domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Replace with your own API key
 RAPIDAPI_KEY = "782d6d8862msh8f2f93f8954c7bcp1d4295jsn49c7eca0cd55"
 API_HOST = "youtube-info-download-api.p.rapidapi.com"
