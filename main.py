@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 
 app = FastAPI()
+# Root route
+@app.get("/")
+def read_root():
+    return {"message": "API is working"}
 
 # CORS setup for frontend access
 app.add_middleware(
