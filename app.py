@@ -2,11 +2,13 @@
 
 from flask import Flask, request, jsonify
 import http.client
+from flask_cors import CORS
 import json
 import urllib.parse
 from config import RAPIDAPI_KEY, RAPIDAPI_HOST
 
 app = Flask(__name__)
+CORS(app, origins=["https://youtube-downloader-api-i44x.onrender.com"])
 
 def make_rapidapi_request(endpoint):
     conn = http.client.HTTPSConnection(RAPIDAPI_HOST)
