@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import http.client
 import json
 from config import RAPIDAPI_KEY, RAPIDAPI_HOST
+import os
 
 app = Flask(__name__)
 
